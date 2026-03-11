@@ -22,8 +22,8 @@ st.markdown(f"""
         }}
         .main .block-container {{ max-width: 100% !important; padding: 1rem !important; }}
         .page-break {{ page-break-before: always; }}
-        .tc-text {{ font-size: 7pt !important; line-height: 1.1; color: #333; text-align: justify; }}
-        .tc-column {{ column-count: 2; column-gap: 20px; }}
+        .tc-text {{ font-size: 6.8pt !important; line-height: 1.1; color: #333; text-align: justify; }}
+        .tc-column {{ column-count: 2; column-gap: 25px; }}
     }}
     section[data-testid="stSidebar"] {{ background-color: {CROSS_DARK}; color: white; }}
     [data-testid="stMetricValue"] {{ color: {CROSS_BLUE} !important; font-weight: 800; }}
@@ -49,21 +49,36 @@ with st.sidebar:
     def get_val(key, default):
         return save_data.get(key, default)
 
+    # PROPOSAL SETTINGS
     with st.expander("📄 Proposal Details", expanded=True):
         client_name = st.text_input("Client Name", value=get_val("client_name", ""))
         contact_person = st.text_input("Contact Person", value=get_val("contact_person", ""))
         cross_ref = st.text_input("Cross Reference", value=get_val("cross_ref", ""))
-        report_ready = st.toggle("🚀 Generate Final Proposal")
+        report_ready = st.toggle("🚀 Generate Final Proposal", value=False)
 
-# --- 3. INPUT GATHERING (Workbench View) ---
+    # HEATING & UTILITIES
+    with st.expander("🔥 Heating System & Utilities", expanded=False):
+        heat_source = st.selectbox("Heat Source", ["Gas", "Electric", "Heat Pump"], index=0)
+        cop = st.number_input("Heat Pump COP", value=get_val("cop", 3.5)) if heat_source == "Heat Pump" else 1.0
+        elec_price = st.number_input("Elec Price (£/kWh)", value=get_val("elec_price", 0.28))
+        gas_price = st.number_input("Gas Price (£/kWh)", value=get_val("gas_price", 0.08))
+
+    # U-VALUES
+    with st.expander("🏗️ U-Value Calibration", expanded=False):
+        u_wall_ext = st.number_input("External Walls", value=get_val("u_wall_ext", 0.25))
+        u_wall_int = st.number_input("Internal Walls", value=get_val("u_wall_int", 1.50))
+        u_floor = st.number_input("Floor", value=get_val("u_floor", 0.15))
+        u_roof = st.number_input("Roof", value=get_val("u_roof", 0.18))
+        u_window = st.number_input("Windows", value=get_val("u_window", 1.31))
+        u_door = st.number_input("Doors", value=get_val("u_door", 1.30))
+
+# --- 3. THE WORKBENCH INPUTS (Now outside the IF to keep data alive) ---
 if not report_ready:
     st.title("Proposal Workbench")
     
-    row1_l, row1_r = st.columns(2)
-    with row1_l:
-        proj_name = st.text_input("Project Reference", value=get_val("proj_name", ""))
-    with row1_r:
-        area_val = st.number_input("Floor Area (m²)", value=get_val("area_val", 0.0))
+    r1c1, r1c2 = st.columns(2)
+    proj_name = r1c1.text_input("Project Reference", value=get_val("proj_name", ""))
+    area_val = r1c2.number_input("Floor Area (m²)", value=get_val("area_val", 0.0))
 
     st.subheader("Room Parameters")
     c1, c2, c3, c4 = st.columns(4)
@@ -73,49 +88,52 @@ if not report_ready:
     door_area_val = c4.number_input("Doors (m²)", value=get_val("door_area_val", 0.0))
 
     st.subheader("Surface Exposures")
-    row3_l, row3_r = st.columns(2)
-    ext_wall_area_val = row3_l.number_input("External Wall Area (m²)", value=get_val("ext_wall_area_val", 0.0))
-    int_wall_area_val = row3_r.number_input("Internal Wall Area (m²)", value=get_val("int_wall_area_val", 0.0))
+    r2c1, r2c2 = st.columns(2)
+    ext_wall_area_val = r2c1.number_input("External Wall Area (m²)", value=get_val("ext_wall_area_val", 0.0))
+    int_wall_area_val = r2c2.number_input("Internal Wall Area (m²)", value=get_val("int_wall_area_val", 0.0))
+    
+    # Store these in session state so they persist when we toggle the report
+    st.session_state.update({
+        "proj_name": proj_name, "area_val": area_val, "height_val": height_val,
+        "ach_val": ach_val, "win_area_val": win_area_val, "door_area_val": door_area_val,
+        "ext_wall_area_val": ext_wall_area_val, "int_wall_area_val": int_wall_area_val
+    })
 
-    # Save to session state for transfer
-    st.session_state.proj_name = proj_name
-    st.session_state.area_val = area_val
-    st.session_state.height_val = height_val
-    st.session_state.ach_val = ach_val
-    st.session_state.win_area_val = win_area_val
-    st.session_state.door_area_val = door_area_val
-    st.session_state.ext_wall_area_val = ext_wall_area_val
-    st.session_state.int_wall_area_val = int_wall_area_val
-
-# --- 4. DATA RECOVERY (Proposal View) ---
+# If report is ready, we fetch from the session state we just updated
 else:
-    proj_name = st.session_state.get('proj_name', get_val("proj_name", ""))
-    area_val = st.session_state.get('area_val', get_val("area_val", 0.0))
-    height_val = st.session_state.get('height_val', get_val("height_val", 0.0))
-    ach_val = st.session_state.get('ach_val', get_val("ach_val", 0.5))
-    win_area_val = st.session_state.get('win_area_val', get_val("win_area_val", 0.0))
-    door_area_val = st.session_state.get('door_area_val', get_val("door_area_val", 0.0))
-    ext_wall_area_val = st.session_state.get('ext_wall_area_val', get_val("ext_wall_area_val", 0.0))
-    int_wall_area_val = st.session_state.get('int_wall_area_val', get_val("int_wall_area_val", 0.0))
+    proj_name = st.session_state.get("proj_name", "")
+    area_val = st.session_state.get("area_val", 0.0)
+    height_val = st.session_state.get("height_val", 0.0)
+    ach_val = st.session_state.get("ach_val", 0.5)
+    win_area_val = st.session_state.get("win_area_val", 0.0)
+    door_area_val = st.session_state.get("door_area_val", 0.0)
+    ext_wall_area_val = st.session_state.get("ext_wall_area_val", 0.0)
+    int_wall_area_val = st.session_state.get("int_wall_area_val", 0.0)
 
-# --- 5. CALCULATIONS ---
+# --- 4. GLOBAL CALCULATIONS ---
 delta_t_ext = 25 
 vol = area_val * height_val
 inf_loss = 0.33 * ach_val * vol * delta_t_ext
-ext_wall_loss = ext_wall_area_val * 0.25 * delta_t_ext
-int_wall_loss = int_wall_area_val * 1.5 * 5 
-total_kw = (inf_loss + ext_wall_loss + int_wall_loss + (area_val * 0.15 * delta_t_ext)) / 1000
+ext_wall_loss = ext_wall_area_val * u_wall_ext * delta_t_ext
+int_wall_loss = int_wall_area_val * u_wall_int * 5 
+floor_loss = area_val * u_floor * delta_t_ext
+roof_loss = area_val * u_roof * delta_t_ext
+door_loss = door_area_val * u_door * delta_t_ext
+win_loss = win_area_val * u_window * delta_t_ext
+
+total_kw = (inf_loss + ext_wall_loss + int_wall_loss + floor_loss + roof_loss + door_loss + win_loss) / 1000
 peak_kw = total_kw * 1.15
 budget_capex = peak_kw * CAPEX_FACTOR
 
+# Chart
 df_chart = pd.DataFrame({
     'Category': ['Infiltration', 'Ext Walls', 'Int Walls', 'Floor', 'Roof', 'Doors', 'Windows'],
-    'Loss (W)': [inf_loss, ext_wall_loss, int_wall_loss, (area_val*0.15*25), (area_val*0.18*25), (door_area_val*1.3*25), (win_area_val*1.3*25)]
+    'Loss (W)': [inf_loss, ext_wall_loss, int_wall_loss, floor_loss, roof_loss, door_loss, win_loss]
 }).sort_values(by='Loss (W)', ascending=False)
 fig = go.Figure(data=[go.Bar(x=df_chart['Category'], y=df_chart['Loss (W)'], marker_color=CROSS_BLUE)])
 fig.update_layout(height=350, margin=dict(t=10, b=10, l=10, r=10), plot_bgcolor='rgba(0,0,0,0)')
 
-# --- 6. OUTPUTS ---
+# --- 5. FINAL VIEWS ---
 if not report_ready:
     st.divider()
     m1, m2, m3 = st.columns(3)
@@ -125,6 +143,7 @@ if not report_ready:
     st.plotly_chart(fig, use_container_width=True)
 
 else:
+    # PROPOSAL HEADER
     c1, c2 = st.columns([1,1])
     with c1:
         if os.path.exists(LOGO_FILE): st.image(LOGO_FILE, width=220)
@@ -145,6 +164,7 @@ else:
     
     st.markdown('<div class="page-break"></div>', unsafe_allow_html=True)
 
+    # PAGE 2
     st.header("Budget Quotation Overview")
     st.write(f"**Attention:** {contact_person if contact_person else 'Sir / Madam'},")
     st.write(f"**Client:** {client_name}")
@@ -163,7 +183,7 @@ else:
 
     st.markdown('<div class="page-break"></div>', unsafe_allow_html=True)
 
-    # FULL TERMS AND CONDITIONS
+    # PAGE 3: FULL TERMS & CONDITIONS (ALL 23 CLAUSES)
     st.header("Terms and Conditions of Sale")
     st.markdown("""
     <div class="tc-text tc-column">
@@ -174,19 +194,19 @@ else:
     <p><strong>5.</strong> Unless otherwise provided, all accounts shall be paid within 30 days of issue of the invoice. Payment is a condition precedent to further deliveries.</p>
     <p><strong>6.</strong> If delivery is prevented or delayed by Act of God, Government, War, strike, lockout, civil disturbances, or other events beyond the Company's control, the Company may terminate or amend the Contract without liability.</p>
     <p><strong>7.</strong> Goods shall be packed to reach the destination in good condition under normal transport and delivered to the nearest off-loading point.</p>
-    <p><strong>8.</strong> The Company shall endeavour to meet delivery dates but shall be under no liability for failure to meet such dates. Extension of delivery time by three months allows either party to cancel without claim.</p>
-    <p><strong>9. (a)</strong> If the Customer cannot accept delivery, the Company may store goods at the Customer's expense, including insurance and interest at current overdraft rates. <strong>(b)</strong> Signature of any employee acknowledging receipt is conclusive evidence of receipt.</p>
-    <p><strong>10. (a)</strong> Liability ceases immediately after goods are delivered to a public carrier. <strong>(b)</strong> Shortage or damage claims must be made in writing within seven days of delivery; non-delivery claims within ten days of dispatch.</p>
-    <p><strong>11.</strong> Time of payment is of the essence. Failure to pay allows the Company to suspend deliveries and charge interest at 2% per month on overdue accounts.</p>
+    <p><strong>8.</strong> The Company shall endeavour to meet delivery dates but shall be under no liability for failure to meet such dates.</p>
+    <p><strong>9. (a)</strong> If the Customer cannot accept delivery, the Company may store goods at the Customer's expense. <strong>(b)</strong> Signature of any employee acknowledging receipt is conclusive evidence of receipt.</p>
+    <p><strong>10. (a)</strong> Liability ceases immediately after goods are delivered to a public carrier. <strong>(b)</strong> Shortage or damage claims must be made in writing within seven days of delivery.</p>
+    <p><strong>11.</strong> Time of payment is of the essence. Interest charged at 2% per month on overdue accounts.</p>
     <p><strong>12.</strong> The Company is entitled to retain possession of all goods for the unpaid price of any goods sold under this or any other contract.</p>
     <p><strong>13.</strong> Stoppage in transit rights allow the Company to regain possession of goods for the unpaid price.</p>
-    <p><strong>14. (a)</strong> Specifications must be supplied by the Customer in reasonable time. <strong>(b)</strong> For special goods made to Customer design, the Company is not liable for faults in design, and the Customer shall indemnify the Company against patent claims. <strong>(c)</strong> Equipment may vary from specification due to improvements. <strong>(d)</strong> Substituted materials may be used if specified ones are unavailable.</p>
-    <p><strong>15.</strong> The Company extends the manufacturer's appropriate warranty in place of all others. Warranty does not include labour, refrigerant, or taxes unless stated in writing. Accidental damage or unauthorized repair voids warranty.</p>
-    <p><strong>16.</strong> If the Customer defaults, commits a breach, or enters bankruptcy/liquidation, the Company may suspend deliveries and determine the contract.</p>
+    <p><strong>14. (a)</strong> Specifications must be supplied by the Customer. <strong>(b)</strong> For special goods made to Customer design, the Company is not liable for faults in design. <strong>(c)</strong> Equipment may vary from specification due to improvements. <strong>(d)</strong> Substituted materials may be used.</p>
+    <p><strong>15.</strong> The Company extends the manufacturer's appropriate warranty. Warranty does not include labour, refrigerant, or taxes. Accidental damage voids warranty.</p>
+    <p><strong>16.</strong> If the Customer defaults or enters bankruptcy/liquidation, the Company may suspend deliveries and determine the contract.</p>
     <p><strong>17.</strong> If the Customer's financial position warrants it, the Company may demand cash payment before delivery.</p>
     <p><strong>18.</strong> In the event of Clause 17 arising, the Customer shall indemnify the Company against all loss and expenses.</p>
-    <p><strong>19. (a)</strong> Ownership remains with the Company until all debts are paid in full. <strong>(b)</strong> Until then, Customer must store goods separately and hold them as bailee/trustee. <strong>(c)</strong> The Company may re-take possession without notice.</p>
-    <p><strong>20.</strong> Risk passes upon delivery. Provisions do not entitle Customer to delay payment due to property not yet passing.</p>
+    <p><strong>19. (a)</strong> Ownership remains with the Company until all debts are paid in full. <strong>(b)</strong> Customer must store goods separately. <strong>(c)</strong> Company may re-take possession without notice.</p>
+    <p><strong>20.</strong> Risk passes upon delivery. Provisions do not entitle Customer to delay payment.</p>
     <p><strong>21.</strong> Contract deemed made at the registered office; disputes decided under the laws of Northern Ireland.</p>
     <p><strong>22.</strong> Specifications and drawings remain Company property, must be returned on request, and cannot be disclosed to third parties.</p>
     <p><strong>23.</strong> Scheduled orders constitute authority for manufacture. Failure to call on quantity results in liability for all Company loss and expenses.</p>
@@ -195,7 +215,7 @@ else:
 
     if st.button("⬅️ Back to Editor"): st.rerun()
 
-# --- 7. EXPORT ---
+# --- 6. EXPORT ---
 current_params = {
     "proj_name": proj_name, "area_val": area_val, "height_val": height_val, "ach_val": ach_val,
     "win_area_val": win_area_val, "door_area_val": door_area_val,
