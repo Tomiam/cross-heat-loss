@@ -6,10 +6,9 @@ import os
 # --- 1. BRANDING & STYLE ---
 st.set_page_config(page_title="Cross Group | Heat Loss Calculator", layout="wide")
 
-# BRAND COLORS
 CROSS_BLUE = "#1C4E80"  # Your corporate blue
 CROSS_DARK = "#1A1A1A"
-CROSS_RED = "#E31E24"   # Keeping the red as a subtle accent
+CROSS_RED = "#E31E24"
 LOGO_FILE = "logo-home.png"
 
 st.markdown(f"""
@@ -38,10 +37,10 @@ st.markdown(f"""
         letter-spacing: 1px;
     }}
     .stMetric {{ 
-        background-color: #f1f5f9; /* Professional Light Grey-Blue */
+        background-color: #f1f5f9; 
         padding: 20px; 
         border: 1px solid #e2e8f0; 
-        border-top: 5px solid {CROSS_RED}; /* Subtle Cross Red brand accent */
+        border-top: 5px solid {CROSS_RED}; 
         border-radius: 8px; 
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }}
@@ -64,7 +63,13 @@ with st.sidebar:
     else:
         st.markdown(f"<h2 style='color:{CROSS_BLUE};'>CROSS GROUP</h2>", unsafe_allow_html=True)
     
-    st.caption("Strategic Thermal Engineering")
+    # --- UPDATED WORDING HERE ---
+    st.markdown(f"""
+        <p style='color: #94a3b8; font-size: 0.75rem; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; margin-top: -10px;'>
+        Advanced Temperature Control
+        </p>
+        """, unsafe_allow_html=True)
+    
     st.divider()
     
     report_ready = st.toggle("🚀 Prepare Report for PDF")
@@ -95,7 +100,7 @@ if report_ready:
     with col_r:
         st.markdown(f"<div style='text-align:right;'><strong>Audit Date:</strong> {pd.Timestamp.now().strftime('%d/%m/%Y')}<br><strong>Ref:</strong> Asset Performance Audit</div>", unsafe_allow_html=True)
     
-    st.info("💡 **Ready to Export:** Press **Ctrl + P** to save as PDF. Ensure 'Background Graphics' is ON.")
+    st.info("💡 **Report View Active:** Press **Ctrl + P** to save as PDF. Ensure 'Background Graphics' is ON.")
     if st.button("⬅️ Back to Editor"):
         st.rerun()
 
