@@ -6,75 +6,51 @@ import os
 # --- 1. BRANDING & STYLE ---
 st.set_page_config(page_title="Cross Group | Heat Loss Calculator", layout="wide")
 
-CROSS_BLUE = "#1C4E80"  # Your corporate blue
+CROSS_BLUE = "#1C4E80"
 CROSS_DARK = "#1A1A1A"
 CROSS_RED = "#E31E24"
 LOGO_FILE = "logo-home.png"
+CAPEX_FACTOR = 1750  # Your requested £1750 per kW
 
 st.markdown(f"""
     <style>
     * {{ -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }}
-    
     @media print {{
         [data-testid="stSidebar"], .stButton, header, [data-testid="stHeader"], [data-testid="stToolbar"] {{ 
             display: none !important; 
         }}
         .main .block-container {{ max-width: 100% !important; padding: 1rem !important; }}
     }}
-    
-    /* Sidebar styling */
     section[data-testid="stSidebar"] {{ background-color: {CROSS_DARK}; color: white; }}
-    
-    /* THEMED METRIC BOXES */
-    [data-testid="stMetricValue"] {{ 
-        color: {CROSS_BLUE} !important; 
-        font-weight: 800; 
-    }}
-    [data-testid="stMetricLabel"] {{
-        color: {CROSS_DARK} !important;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }}
+    [data-testid="stMetricValue"] {{ color: {CROSS_BLUE} !important; font-weight: 800; }}
+    [data-testid="stMetricLabel"] {{ color: {CROSS_DARK} !important; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }}
     .stMetric {{ 
         background-color: #f1f5f9; 
         padding: 20px; 
         border: 1px solid #e2e8f0; 
         border-top: 5px solid {CROSS_RED}; 
         border-radius: 8px; 
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }}
-    
-    /* Header styling */
-    h1 {{ 
-        color: {CROSS_DARK}; 
-        border-bottom: 3px solid {CROSS_BLUE}; 
-        padding-bottom: 10px; 
-        text-transform: uppercase; 
-        font-weight: 900; 
-    }}
+    h1 {{ color: {CROSS_DARK}; border-bottom: 3px solid {CROSS_BLUE}; padding-bottom: 10px; text-transform: uppercase; font-weight: 900; }}
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. SIDEBAR LOGO & CONFIG ---
+# --- 2. SIDEBAR CONFIGURATION ---
 with st.sidebar:
     if os.path.exists(LOGO_FILE):
         st.image(LOGO_FILE, use_container_width=True)
     else:
         st.markdown(f"<h2 style='color:{CROSS_BLUE};'>CROSS GROUP</h2>", unsafe_allow_html=True)
     
-    # --- UPDATED WORDING HERE ---
-    st.markdown(f"""
-        <p style='color: #94a3b8; font-size: 0.75rem; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; margin-top: -10px;'>
-        Advanced Temperature Control
-        </p>
-        """, unsafe_allow_html=True)
-    
+    st.markdown(f"<p style='color: #94a3b8; font-size: 0.75rem; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; margin-top: -10px;'>Advanced Temperature Control</p>", unsafe_allow_html=True)
     st.divider()
     
+    # Financial Toggle
+    st.subheader("Reporting Options")
+    show_budget = st.toggle("💰 Include Budgetary Capex", value=False)
     report_ready = st.toggle("🚀 Prepare Report for PDF")
-    st.divider()
     
+    st.divider()
     st.subheader("Design Conditions")
     target_temp = st.number_input("Target Internal Temp (°C)", value=20)
     ext_temp = st.number_input("Design External Temp (°C)", value=-5)
@@ -100,7 +76,6 @@ if report_ready:
     with col_r:
         st.markdown(f"<div style='text-align:right;'><strong>Audit Date:</strong> {pd.Timestamp.now().strftime('%d/%m/%Y')}<br><strong>Ref:</strong> Asset Performance Audit</div>", unsafe_allow_html=True)
     
-    st.info("💡 **Report View Active:** Press **Ctrl + P** to save as PDF. Ensure 'Background Graphics' is ON.")
     if st.button("⬅️ Back to Editor"):
         st.rerun()
 
@@ -127,14 +102,24 @@ d_loss = door_area * u_door * delta_t
 total_kw = (v_loss + w_loss + f_loss + r_loss + d_loss) / 1000
 peak_kw = total_kw * 1.15
 seasonal_cost = total_kw * 12 * 0.12 * 180
+budget_capex = peak_kw * CAPEX_FACTOR
 
 # Output Metrics
 st.divider()
 st.subheader("Executive Metrics")
-m1, m2, m3 = st.columns(3)
-m1.metric("Peak Design Load", f"{peak_kw:,.1f} kW")
-m2.metric("Seasonal Spend", f"£{seasonal_cost:,.0f}")
-m3.metric("Building Volume", f"{vol:,} m³")
+
+# Layout adjustment based on toggle
+if show_budget:
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Peak Design Load", f"{peak_kw:,.1f} kW")
+    m2.metric("Seasonal Spend", f"£{seasonal_cost:,.0f}")
+    m3.metric("Building Volume", f"{vol:,} m³")
+    m4.metric("Budgetary Capex", f"£{budget_capex:,.0f}")
+else:
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Peak Design Load", f"{peak_kw:,.1f} kW")
+    m2.metric("Seasonal Spend", f"£{seasonal_cost:,.0f}")
+    m3.metric("Building Volume", f"{vol:,} m³")
 
 # Chart
 st.subheader("Heat Loss Breakdown")
@@ -147,4 +132,7 @@ fig.update_layout(height=400, margin=dict(t=10, b=10, l=10, r=10), plot_bgcolor=
 st.plotly_chart(fig, use_container_width=True)
 
 st.divider()
-st.caption(f"Proprietary Audit Tool | © Cross Group | Project: {proj} | Design ΔT: {delta_t}K")
+footer_text = f"Proprietary Audit Tool | © Cross Group | Project: {proj} | Design ΔT: {delta_t}K"
+if show_budget:
+    footer_text += f" | Budget factor: £{CAPEX_FACTOR}/kW"
+st.caption(footer_text)
