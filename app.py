@@ -23,8 +23,8 @@ st.markdown(f"""
         }}
         .main .block-container {{ max-width: 100% !important; padding: 1rem !important; }}
         .page-break {{ page-break-before: always; }}
-        .tc-text {{ font-size: 7.2pt !important; line-height: 1.1; color: #333; text-align: justify; }}
-        .tc-column {{ column-count: 2; column-gap: 25px; }}
+        .tc-text {{ font-size: 6.8pt !important; line-height: 1.1; color: #333; text-align: justify; }}
+        .tc-column {{ column-count: 2; column-gap: 20px; }}
     }}
     section[data-testid="stSidebar"] {{ background-color: {CROSS_DARK}; color: white; }}
     [data-testid="stMetricValue"] {{ color: white !important; font-weight: 800; }}
@@ -47,7 +47,6 @@ with st.sidebar:
     else:
         st.markdown(f"<h2 style='color:{CROSS_BLUE}; text-align:center;'>CROSS GROUP</h2>", unsafe_allow_html=True)
     
-    # CENTRED SUB-HEADER
     st.markdown(f"<p style='color: #94a3b8; font-size: 0.75rem; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; text-align: center; margin-top: -15px;'>Advanced Temperature Control</p>", unsafe_allow_html=True)
     st.divider()
 
@@ -81,7 +80,6 @@ with st.sidebar:
 # --- 3. INPUT GATHERING ---
 if not report_ready:
     st.title("Proposal Workbench")
-    
     with st.expander("🏗️ Building & Room Data", expanded=True):
         row1_l, row1_r = st.columns(2)
         proj_name = row1_l.text_input("Project Reference", value=get_val("proj_name", ""))
@@ -101,10 +99,10 @@ if not report_ready:
         door_area_val = c3.number_input("Doors Area (m²)", value=get_val("door_area_val", 260.0))
 
         st.subheader("Surface Exposures")
-        r2c1, r2c2, r2c3 = st.columns(3)
-        ext_wall_len = r2c1.number_input("Ext. Wall Length (m)", value=get_val("ext_wall_len", 100.0))
-        int_wall_len = r2c2.number_input("Int. Wall Length (m)", value=get_val("int_wall_len", 0.0))
-        preheat_pct = r2c3.number_input("Preheat Allowance (%)", value=get_val("preheat_pct", 15.0))
+        r2_c1, r2_c2, r2_c3 = st.columns(3)
+        ext_wall_len = r2_c1.number_input("Ext. Wall Length (m)", value=get_val("ext_wall_len", 100.0))
+        int_wall_len = r2_c2.number_input("Int. Wall Length (m)", value=get_val("int_wall_len", 0.0))
+        preheat_pct = r2_c3.number_input("Preheat/Warm-up Allowance (%)", value=get_val("preheat_pct", 15.0))
     
     with st.expander("🌬️ System Design (Airflow & Season)", expanded=False):
         ac_col1, ac_col2 = st.columns(2)
@@ -120,8 +118,7 @@ if not report_ready:
         "ach_val": ach_val, "door_area_val": door_area_val, "ext_wall_len": ext_wall_len, 
         "int_wall_len": int_wall_len, "target_temp": target_temp, "ext_temp": ext_temp, 
         "delta_t_int": delta_t_int, "preheat_pct": preheat_pct, "supply_delta": supply_delta,
-        "airflow_unit": airflow_unit, "full_load_hrs": full_load_hrs, "season_days": season_days,
-        "u_wall_ext": u_wall_ext, "u_wall_int": u_wall_int, "u_floor": u_floor, "u_roof": u_roof, "u_door": u_door
+        "airflow_unit": airflow_unit, "full_load_hrs": full_load_hrs, "season_days": season_days
     })
 else:
     proj_name = st.session_state.get("proj_name", "")
@@ -140,11 +137,6 @@ else:
     airflow_unit = st.session_state.get("airflow_unit", "m³/h")
     full_load_hrs = st.session_state.get("full_load_hrs", 12.0)
     season_days = st.session_state.get("season_days", 180)
-    u_wall_ext = st.session_state.get("u_wall_ext", 0.25)
-    u_wall_int = st.session_state.get("u_wall_int", 0.15)
-    u_floor = st.session_state.get("u_floor", 0.15)
-    u_roof = st.session_state.get("u_roof", 0.18)
-    u_door = st.session_state.get("u_door", 1.30)
 
 # --- 4. CALCULATIONS ---
 vol = area_val * height_val
@@ -159,6 +151,12 @@ total_fabric_w = inf_loss + ext_wall_loss + int_wall_loss + floor_loss + roof_lo
 fabric_kw = total_fabric_w / 1000
 preheat_kw = fabric_kw * (preheat_pct / 100)
 final_peak_kw = fabric_kw + preheat_kw
+
+# GLOBAL CHART DATA (CALCULATED BEFORE VIEWS)
+c_data = pd.DataFrame({
+    'Category': ['Infiltration', 'Ext Walls', 'Int Walls', 'Floor', 'Roof', 'Doors', 'Preheat'],
+    'kW': [inf_loss/1000, ext_wall_loss/1000, int_wall_loss/1000, floor_loss/1000, roof_loss/1000, door_loss/1000, preheat_kw]
+}).sort_values('kW', ascending=False)
 
 w_per_m2 = (final_peak_kw * 1000) / area_val if area_val > 0 else 0
 req_airflow_h = (final_peak_kw * 1000) / (1.2 * 0.27 * supply_delta) if supply_delta > 0 else 0
@@ -180,14 +178,12 @@ if not report_ready:
     m_cols[3].metric(f"Req. Airflow ({airflow_unit})", f"{final_airflow:,.1f}" if airflow_unit == "m³/s" else f"{final_airflow:,.0f}")
     if show_budget: m_cols[4].metric("Budgetary Capex", f"£{budget_capex:,.0f}")
     
-    c_data = pd.DataFrame({
-        'Category': ['Infiltration', 'Ext Walls', 'Int Walls', 'Floor', 'Roof', 'Doors', 'Preheat'],
-        'kW': [inf_loss/1000, ext_wall_loss/1000, int_wall_loss/1000, floor_loss/1000, roof_loss/1000, door_loss/1000, preheat_kw]
-    }).sort_values('kW', ascending=False)
     fig = go.Figure(data=[go.Bar(x=c_data['Category'], y=c_data['kW'], marker_color=CROSS_BLUE, text=c_data['kW'].apply(lambda x: f"{x:,.1f} kW"), textposition='outside')])
     fig.update_layout(height=400, margin=dict(t=30, b=10, l=10, r=10), plot_bgcolor='rgba(0,0,0,0)', font=dict(color="white"))
     st.plotly_chart(fig, use_container_width=True)
+
 else:
+    # PROPOSAL PDF
     c1, c2 = st.columns([1,1])
     with c1:
         if os.path.exists(LOGO_FILE): st.image(LOGO_FILE, width=220)
@@ -210,27 +206,42 @@ else:
     pcols[2].metric("Heat Density", f"{w_per_m2:,.1f} W/m²")
     st.write(f"Heating costs are estimated using the Standard Season Formula, based on using **{heat_source}** with an annual requirement of **{annual_kwh:,.0f} kWh**.")
     
-    # Re-draw figure for report
-    c_data_rep = pd.DataFrame({
-        'Category': ['Infiltration', 'Ext Walls', 'Int Walls', 'Floor', 'Roof', 'Doors', 'Preheat'],
-        'kW': [inf_loss/1000, ext_wall_loss/1000, int_wall_loss/1000, floor_loss/1000, roof_loss/1000, door_loss/1000, preheat_kw]
-    }).sort_values('kW', ascending=False)
-    fig_rep = go.Figure(data=[go.Bar(x=c_data_rep['Category'], y=c_data_rep['kW'], marker_color=CROSS_BLUE, text=c_data_rep['kW'].apply(lambda x: f"{x:,.1f} kW"), textposition='outside')])
+    fig_rep = go.Figure(data=[go.Bar(x=c_data['Category'], y=c_data['kW'], marker_color=CROSS_BLUE, text=c_data['kW'].apply(lambda x: f"{x:,.1f} kW"), textposition='outside')])
     fig_rep.update_layout(height=400, margin=dict(t=30, b=10, l=10, r=10), plot_bgcolor='rgba(0,0,0,0)', font=dict(color="black"))
     st.plotly_chart(fig_rep, use_container_width=True)
 
     st.markdown('<div class="page-break"></div>', unsafe_allow_html=True)
+    
     st.header("Terms and Conditions of Sale")
-    st.markdown("""<div class="tc-text tc-column"><p><strong>1. (a)</strong> Contract entered into between Cross Refrigeration (N.I.) Limited and the Customer. (b) Overrides all earlier conditions. (c) All guarantees, warranties and conditions implied by statute are excluded.</p>
-    <p><strong>3.</strong> Prices provisional and subject to market changes.</p>
-    <p><strong>5.</strong> Payment strictly within 30 days of invoice.</p>
-    <p><strong>11.</strong> Interest charged at 2% per month on overdue sums.</p>
-    <p><strong>19.</strong> Ownership remains with the Company until full payment.</p>
-    <p><strong>21.</strong> Disputes governed by laws of Northern Ireland.</p>
-    <p><strong>22.</strong> Specifications remain Company property.</p>
-    <p><strong>23.</strong> Scheduled orders constitute authority to manufacture.</p></div>""", unsafe_allow_html=True)
+    st.markdown("""
+    <div class="tc-text tc-column">
+    <p><strong>1. (a)</strong> It is hereby agreed that a contract shall be entered into between Cross Refrigeration (N.I.) Limited (hereinafter referred to as "the Company") and the person, Firm, Corporation, sole Undertaking, Association or Body, proposing to purchase from The Company (hereinafter referred to as "the Customer") any goods on foot of an order placed whether orally or in writing, by The Customer. <strong>(b)</strong> It is agreed that such contract as aforesaid shall be subject to the conditions hereinafter stipulated, and that such conditions supersede any earlier sets of conditions appearing in any of the Company's invoices, credit notes or any other documents whatsoever and shall override any terms and conditions and shall be binding upon the Customer unless otherwise stipulated herein and agreed to in writing by a duly authorised officer of the Company. <strong>(c)</strong> All guarantees, warranties and conditions, (including any conditions as to the quality or the fitness of the goods for any particular purpose, whether expressed or implied by statute, common law, or otherwise), are hereby excluded. <strong>(d)</strong> All goods supplied by the Company shall be in accordance with standards as specified by the Company and Customary trade standards subject to due allowance for processing any other recognised tolerances.</p>
+    <p><strong>2.</strong> All orders for goods by the Customer through any agent or representative or sales representative of the Company shall be subject to the acceptance and approval of such order, or orders, by the Company and all deliveries of goods in respect of any such order or orders shall be subject to the approval and authorisation only by the Company, at its Head Office in Armagh, Northern Ireland.</p>
+    <p><strong>3.</strong> It is hereby agreed that any price as quoted by the Company as comprised in the Contract is provisional only and shall be subject to market changes and changes in basic National Wage Agreement Rates, Freight Rates, Rates of Exchange, Costs of Materials, (including raw materials) or other relevant costs. Any goods supplied by the Company may be charged at the prices ruling as at the date of delivery to the Customer.</p>
+    <p><strong>4.</strong> Unless otherwise expressly provided, it is agreed that all prices shall be exclusive of Value Added Tax or any other tax or taxes hereinafter imposed, whether statutory or otherwise, and it is further agreed that the Company shall be entitled to receive from the Customer any difference in price in respect of a variation in the value added tax rates.</p>
+    <p><strong>5.</strong> Unless otherwise provided, it is agreed that all accounts shall be paid within 30 days of issue of the invoice. It is further agreed that all payments due shall be made on or before the due date as a condition precedent to further deliveries.</p>
+    <p><strong>6.</strong> It is agreed that if preparation, manufacture or delivery of the goods is prevented or delayed in any way whatsoever by any Act of God or of any Government, War (whether declared or not) invasion or any other War like action, any strike, lockout or any Industrial Action or any civil disturbances, non-availability of raw materials, accident, mechanical failures, fire or any other event, or any action of a third party whatsoever, beyond the Company's reasonable control, then in any such circumstances the Company may upon reasonable notice, terminate, or amend this Contract or any obligation thereunder.</p>
+    <p><strong>7.</strong> It is agreed that the goods shall be packed and secured in such a manner to reach the destination in good condition under normal conditions of transport and shall be delivered by the Company at or dispatched for delivery to the place or places in such a manner as specified in the order or subsequently agreed. Delivery to any such place or places shall be deemed to be affected by delivery at the nearest off-loading point or hard surface road adjoining such place of delivery.</p>
+    <p><strong>8.</strong> The Company shall endeavour to meet delivery dates, but shall be under no liability of any kind if it fails to meet any such date or dates, whatever the cause of failure and whether such causes is under the Company's control or not. If so required by the Company the delivery date or dates may be extended for a reasonable period.</p>
+    <p><strong>9. (a)</strong> If for any reason the Customer is unable to accept the delivery of the goods at the time when the goods are due and ready for delivery by the Company, then the Company, if its storage facilities permit, may agree to store the goods and safeguard them until their delivery and the Customer shall be liable to the Company for storage, insurance and other expenses. <strong>(b)</strong> The signature of any employee of the Customer acknowledging receipt of the goods shall be conclusive evidence of the receipt of such goods as specified in the relevant delivery docket or other documentation.</p>
+    <p><strong>10. (a)</strong> Where goods are delivered by public carrier the liability of the Company shall cease immediately after such goods are delivered to the said carrier its servants or agents for the delivery to the Customer. <strong>(b)</strong> No claim for damages or shortages will be considered unless the Company and any carriers are advised in writing within seven days of the date of delivery and no claim for non-delivery shall be considered unless the Company and any carriers are notified within ten days of the date of dispatch.</p>
+    <p><strong>11.</strong> It is agreed that the time of payment shall be of the essence of the contract and that all accounts shall be paid for in accordance with Clause 5 hereof. If the Customer should fail to make payment on the due date for goods ordered or delivered by the Company to the Customer under this or under any other contract, then the Company may, at its discretion, suspend further deliveries or effect such further deliveries and if any payment or part thereof shall remain in arrears for seven days after written demand shall have been made therefore, the Company may cancel this or any other contracts. The Company shall be entitled to charge interest at the rate of 2% per month on any overdue account.</p>
+    <p><strong>12.</strong> In addition to any right to which the Company may be entitled under statute, common law or otherwise, the Company shall be entitled to retain possession of all goods in its possession or under its control for the unpaid price of any goods sold to the Customer by the Company under this or any other contract.</p>
+    <p><strong>13.</strong> In addition to any other right of stoppage in transit to which the Company may be entitled under statute, common law or otherwise, the Company shall be entitled to retain and regain possession of all goods sold by the Company to the Customer which are in transit for the unpaid price of such goods or any goods sold to the Customer under this contract or any other contract.</p>
+    <p><strong>14. (a)</strong> Where specifications are to be supplied by the Customer to the Company then it is agreed that the Customer shall supply such specifications to the Company in such reasonable time as will enable the Company to compete, manufacture and deliver. <strong>(b)</strong> Where any goods of a special nature are manufactured and delivered in accordance with the Customer's design, pattern, drawings, sample or materials then the Company's interest shall be confined to Manufacture in accordance with the Customer's requirements and under no circumstances shall the Company be liable or responsible to the Customer or any other person or persons whatsoever for any loss or damage howsoever caused. <strong>(c)</strong> In view of recurring improvements in design, we do not bind ourselves to supply equipment identical to the specification. <strong>(d)</strong> If materials are not available as specified, we reserve the right to substitute other materials if in our opinion such substituted materials are suitable.</p>
+    <p><strong>15.</strong> In respect of new equipment the Company shall extend to the Customer the manufacturer's appropriate warranty (if any) and such warranty shall operate in place of all other warranties, conditions or liabilities expressed or implied by law, all of which are hereby expressly excluded. During the warranty period, the Company shall be entitled to inspect equipment at all reasonable times. Title to said machinery and materials shall remain in the possession of the Company until all sums due to the Company have been fully paid in cash.</p>
+    <p><strong>16.</strong> If the Customer should make default in, or commit a breach of, this contract or of any other contract between the Customer and the Company or of any of the obligations of the Customer to the Company, howsoever arising, or if any distress, execution or other process be levied upon the Customers property or assets, the Company shall have the right forthwith to suspend all further deliveries to the Customer and to determine with or without notice any contract then subsisting between the Company and the Customer.</p>
+    <p><strong>17.</strong> Notwithstanding any other provisions or agreement to payments in this contract, if, in the sole and absolute opinion of the Company, the financial position of the Customer warrants such action, then the Company may demand payment in cash or bankers draft, before delivery of all or any part or parts of the goods.</p>
+    <p><strong>18.</strong> It is further agreed that in the event of any of these matters referred to in Clause 17 arising or occurring, then the Customer agrees to indemnify the Company against any loss, damage or expense incurred by the Company in connection with the contract.</p>
+    <p><strong>19. (a)</strong> The ownership of all goods supplied by the Company to the Customer under this contract shall remain in the Company until such times as all Debts due to the Company from the Customer in respect of this or any other contract, have been paid by or on behalf of the Customer. <strong>(b)</strong> Until such time as all debts as aforesaid have been discharged in full, the Customer shall store the goods separately, hold the goods as bailee and trustee for the Company, keep separate books of account, and furnish particulars of any sub-purchasers. <strong>(c)</strong> The Company or its Authorised Agents may without notice re-take possession of any materials or machinery.</p>
+    <p><strong>20.</strong> It is agreed that the risk in the goods shall pass to the Customer or any carrier or agent acting on his behalf and it is further agreed that the provisions hereof shall not entitle the Customer to return any goods or refuse or delay payment on the grounds that his property on such goods is not passed to the Customer.</p>
+    <p><strong>21.</strong> It is agreed that this contract shall be deemed to have been made at the registered office of the Company and that all disputes, differences and questions shall be decided in accordance with the laws of Northern Ireland.</p>
+    <p><strong>22.</strong> It is agreed that the Company does not warrant any particulars, specifications or otherwise as being accurate and the Company reserves the right to alter any such particulars or details where necessary. Any specifications, drawing or any other details whatsoever prepared by the Company for the purpose of a quotation or tender shall remain the property of the Company, and shall be returned on request.</p>
+    <p><strong>23.</strong> A scheduled order (that is an order calling for specific quantity of goods for delivery spread over a period whether specified or not) shall constitute unqualified authority to the Company for the manufacture of that quantity. If the Schedule Order does not specify the date or dates on which the final delivery of the total quantity are to be made, then the Company shall be entitled to require the Customer to accept delivery of the specified quantity within a maximum of twelve months from the date when such order was received.</p>
+    </div>
+    """, unsafe_allow_html=True)
     if st.button("⬅️ Back to Editor"): st.rerun()
 
 # --- 6. EXPORT ---
-cur_p = { "proj_name": proj_name, "area_val": area_val, "height_val": height_val, "ach_val": ach_val, "door_area_val": door_area_val, "ext_wall_len": ext_wall_len, "int_wall_len": int_wall_len, "client_name": client_name, "contact_person": contact_person, "cross_ref": cross_ref, "target_temp": target_temp, "ext_temp": ext_temp, "delta_t_int": delta_t_int, "preheat_pct": preheat_pct, "supply_delta": supply_delta, "airflow_unit": airflow_unit, "show_budget": show_budget, "heat_source": heat_source, "elec_price": elec_price, "gas_price": gas_price, "cop": cop, "full_load_hrs": full_load_hrs, "season_days": season_days, "u_wall_ext": u_wall_ext, "u_wall_int": u_wall_int, "u_floor": u_floor, "u_roof": u_roof, "u_door": u_door }
-st.sidebar.download_button("📥 Export Project Data", data=json.dumps(cur_p), file_name=f"audit_{proj_name}.json", use_container_width=True)
+p_data = { "proj_name": proj_name, "area_val": area_val, "height_val": height_val, "ach_val": ach_val, "door_area_val": door_area_val, "ext_wall_len": ext_wall_len, "int_wall_len": int_wall_len, "client_name": client_name, "contact_person": contact_person, "cross_ref": cross_ref, "target_temp": target_temp, "ext_temp": ext_temp, "delta_t_int": delta_t_int, "preheat_pct": preheat_pct, "supply_delta": supply_delta, "airflow_unit": airflow_unit, "show_budget": show_budget, "heat_source": heat_source, "elec_price": elec_price, "gas_price": gas_price, "cop": cop, "full_load_hrs": full_load_hrs, "season_days": season_days, "u_wall_ext": u_wall_ext, "u_wall_int": u_wall_int, "u_floor": u_floor, "u_roof": u_roof, "u_door": u_door }
+st.sidebar.download_button("📥 Export Project Data", data=json.dumps(p_data), file_name=f"audit_{proj_name}.json", use_container_width=True)
