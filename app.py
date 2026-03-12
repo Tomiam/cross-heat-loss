@@ -47,6 +47,8 @@ with st.sidebar:
     else:
         st.markdown(f"<h2 style='color:{CROSS_BLUE}; text-align:center;'>CROSS GROUP</h2>", unsafe_allow_html=True)
     
+    # CENTRED SUB-HEADER
+    st.markdown(f"<p style='color: #94a3b8; font-size: 0.75rem; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; text-align: center; margin-top: -15px;'>Advanced Temperature Control</p>", unsafe_allow_html=True)
     st.divider()
 
     with st.expander("💾 Project Data Control", expanded=True):
@@ -66,11 +68,10 @@ with st.sidebar:
     with st.expander("🔥 Heating System & Utilities", expanded=True):
         heat_source = st.selectbox("Heat Source", ["Gas", "Electric", "Heat Pump"], index=0)
         cop = st.number_input("Heat Pump COP", value=get_val("cop", 3.5)) if heat_source == "Heat Pump" else 1.0
-        elec_price = st.number_input("Elec Price (£/kWh)", value=get_val("elec_price", 0.28))
-        gas_price = st.number_input("Gas Price (£/kWh)", value=get_val("gas_price", 0.08))
+        elec_price = st.number_input("Elec Price (£/kWh)", value=get_val("elec_price", 0.28), format="%.2f")
+        gas_price = st.number_input("Gas Price (£/kWh)", value=get_val("gas_price", 0.08), format="%.2f")
 
-    # --- RESTORED U-VALUE CALIBRATION ---
-    with st.expander("🏗️ U-Value Calibration", expanded=True):
+    with st.expander("🏗️ U-Value Calibration", expanded=False):
         u_wall_ext = st.number_input("External Walls", value=get_val("u_wall_ext", 0.25), format="%.2f")
         u_wall_int = st.number_input("Internal Walls", value=get_val("u_wall_int", 0.15), format="%.2f")
         u_floor = st.number_input("Floor", value=get_val("u_floor", 0.15), format="%.2f")
@@ -101,8 +102,8 @@ if not report_ready:
 
         st.subheader("Surface Exposures")
         r2c1, r2c2, r2c3 = st.columns(3)
-        ext_wall_area_val = r2c1.number_input("External Wall Area (m²)", value=get_val("ext_wall_area_val", 1300.0))
-        int_wall_length = r2c2.number_input("Internal Wall Length (m)", value=get_val("int_wall_length", 0.0))
+        ext_wall_len = r2c1.number_input("Ext. Wall Length (m)", value=get_val("ext_wall_len", 100.0))
+        int_wall_len = r2c2.number_input("Int. Wall Length (m)", value=get_val("int_wall_len", 0.0))
         preheat_pct = r2c3.number_input("Preheat Allowance (%)", value=get_val("preheat_pct", 15.0))
     
     with st.expander("🌬️ System Design (Airflow & Season)", expanded=False):
@@ -116,21 +117,20 @@ if not report_ready:
         
     st.session_state.update({
         "proj_name": proj_name, "area_val": area_val, "height_val": height_val,
-        "ach_val": ach_val, "door_area_val": door_area_val, "ext_wall_area_val": ext_wall_area_val, 
-        "int_wall_length": int_wall_length, "target_temp": target_temp, "ext_temp": ext_temp, 
+        "ach_val": ach_val, "door_area_val": door_area_val, "ext_wall_len": ext_wall_len, 
+        "int_wall_len": int_wall_len, "target_temp": target_temp, "ext_temp": ext_temp, 
         "delta_t_int": delta_t_int, "preheat_pct": preheat_pct, "supply_delta": supply_delta,
         "airflow_unit": airflow_unit, "full_load_hrs": full_load_hrs, "season_days": season_days,
         "u_wall_ext": u_wall_ext, "u_wall_int": u_wall_int, "u_floor": u_floor, "u_roof": u_roof, "u_door": u_door
     })
 else:
-    # Recover state
     proj_name = st.session_state.get("proj_name", "")
     area_val = st.session_state.get("area_val", 6000.0)
     height_val = st.session_state.get("height_val", 13.0)
     ach_val = st.session_state.get("ach_val", 0.5)
     door_area_val = st.session_state.get("door_area_val", 260.0)
-    ext_wall_area_val = st.session_state.get("ext_wall_area_val", 1300.0)
-    int_wall_length = st.session_state.get("int_wall_length", 0.0)
+    ext_wall_len = st.session_state.get("ext_wall_len", 100.0)
+    int_wall_len = st.session_state.get("int_wall_len", 0.0)
     target_temp = st.session_state.get("target_temp", 20)
     ext_temp = st.session_state.get("ext_temp", -5)
     delta_t_int = st.session_state.get("delta_t_int", 21)
@@ -140,12 +140,17 @@ else:
     airflow_unit = st.session_state.get("airflow_unit", "m³/h")
     full_load_hrs = st.session_state.get("full_load_hrs", 12.0)
     season_days = st.session_state.get("season_days", 180)
+    u_wall_ext = st.session_state.get("u_wall_ext", 0.25)
+    u_wall_int = st.session_state.get("u_wall_int", 0.15)
+    u_floor = st.session_state.get("u_floor", 0.15)
+    u_roof = st.session_state.get("u_roof", 0.18)
+    u_door = st.session_state.get("u_door", 1.30)
 
 # --- 4. CALCULATIONS ---
 vol = area_val * height_val
 inf_loss = 0.33 * ach_val * vol * delta_t_ext
-ext_wall_loss = ext_wall_area_val * u_wall_ext * delta_t_ext
-int_wall_loss = int_wall_length * u_wall_int * delta_t_int 
+ext_wall_loss = (ext_wall_len * height_val) * u_wall_ext * delta_t_ext
+int_wall_loss = (int_wall_len * height_val) * u_wall_int * delta_t_int 
 floor_loss = area_val * u_floor * delta_t_ext
 roof_loss = area_val * u_roof * delta_t_ext
 door_loss = door_area_val * u_door * delta_t_ext
@@ -155,12 +160,10 @@ fabric_kw = total_fabric_w / 1000
 preheat_kw = fabric_kw * (preheat_pct / 100)
 final_peak_kw = fabric_kw + preheat_kw
 
-# Derived Metrics
 w_per_m2 = (final_peak_kw * 1000) / area_val if area_val > 0 else 0
 req_airflow_h = (final_peak_kw * 1000) / (1.2 * 0.27 * supply_delta) if supply_delta > 0 else 0
 final_airflow = req_airflow_h / 3600 if airflow_unit == "m³/s" else req_airflow_h
 
-# Financials
 efficiency = cop if heat_source == "Heat Pump" else 0.9 if heat_source == "Gas" else 1.0
 fuel_rate = gas_price if heat_source == "Gas" else elec_price
 annual_kwh = (final_peak_kw / efficiency) * full_load_hrs * season_days 
@@ -177,7 +180,6 @@ if not report_ready:
     m_cols[3].metric(f"Req. Airflow ({airflow_unit})", f"{final_airflow:,.1f}" if airflow_unit == "m³/s" else f"{final_airflow:,.0f}")
     if show_budget: m_cols[4].metric("Budgetary Capex", f"£{budget_capex:,.0f}")
     
-    # Chart
     c_data = pd.DataFrame({
         'Category': ['Infiltration', 'Ext Walls', 'Int Walls', 'Floor', 'Roof', 'Doors', 'Preheat'],
         'kW': [inf_loss/1000, ext_wall_loss/1000, int_wall_loss/1000, floor_loss/1000, roof_loss/1000, door_loss/1000, preheat_kw]
@@ -185,15 +187,12 @@ if not report_ready:
     fig = go.Figure(data=[go.Bar(x=c_data['Category'], y=c_data['kW'], marker_color=CROSS_BLUE, text=c_data['kW'].apply(lambda x: f"{x:,.1f} kW"), textposition='outside')])
     fig.update_layout(height=400, margin=dict(t=30, b=10, l=10, r=10), plot_bgcolor='rgba(0,0,0,0)', font=dict(color="white"))
     st.plotly_chart(fig, use_container_width=True)
-
 else:
-    # PROPOSAL PDF
     c1, c2 = st.columns([1,1])
     with c1:
         if os.path.exists(LOGO_FILE): st.image(LOGO_FILE, width=220)
     with c2:
         st.markdown(f"<div style='text-align:right; color:{CROSS_BLUE}; font-weight:bold;'>REF: CROSS {cross_ref if cross_ref else '__________'}</div>", unsafe_allow_html=True)
-    
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown(f"""<div style="text-align: center; border: 2px solid {CROSS_BLUE}; padding: 60px; border-radius: 10px; background-color:white;">
             <h1 style="font-size: 3.5rem; margin-bottom: 0; color:{CROSS_DARK};">PROPOSAL</h1>
@@ -203,24 +202,35 @@ else:
             <h3 style="color:{CROSS_DARK};">PROJECT: {proj_name if proj_name else "___________________"}</h3>
             <p style="color:{CROSS_DARK};">Date: {pd.Timestamp.now().strftime('%d %B %Y')}</p>
         </div>""", unsafe_allow_html=True)
-    
     st.markdown('<div class="page-break"></div>', unsafe_allow_html=True)
     st.header("Thermal Performance & Financial Assessment")
-    
     pcols = st.columns(3)
     pcols[0].metric("Peak Design Load", f"{final_peak_kw:,.0f} kW")
     pcols[1].metric("Est. Heating Costs", f"£{annual_spend:,.0f}")
     pcols[2].metric("Heat Density", f"{w_per_m2:,.1f} W/m²")
-
-    st.write(f"Heating costs are estimated using the **Standard Season Formula**, based on using **{heat_source}** with an annual requirement of **{annual_kwh:,.0f} kWh**.")
-    st.plotly_chart(fig, use_container_width=True)
+    st.write(f"Heating costs are estimated using the Standard Season Formula, based on using **{heat_source}** with an annual requirement of **{annual_kwh:,.0f} kWh**.")
+    
+    # Re-draw figure for report
+    c_data_rep = pd.DataFrame({
+        'Category': ['Infiltration', 'Ext Walls', 'Int Walls', 'Floor', 'Roof', 'Doors', 'Preheat'],
+        'kW': [inf_loss/1000, ext_wall_loss/1000, int_wall_loss/1000, floor_loss/1000, roof_loss/1000, door_loss/1000, preheat_kw]
+    }).sort_values('kW', ascending=False)
+    fig_rep = go.Figure(data=[go.Bar(x=c_data_rep['Category'], y=c_data_rep['kW'], marker_color=CROSS_BLUE, text=c_data_rep['kW'].apply(lambda x: f"{x:,.1f} kW"), textposition='outside')])
+    fig_rep.update_layout(height=400, margin=dict(t=30, b=10, l=10, r=10), plot_bgcolor='rgba(0,0,0,0)', font=dict(color="black"))
+    st.plotly_chart(fig_rep, use_container_width=True)
 
     st.markdown('<div class="page-break"></div>', unsafe_allow_html=True)
     st.header("Terms and Conditions of Sale")
-    st.markdown("""<div class="tc-text tc-column">... (Full 23 Clauses) ...</div>""", unsafe_allow_html=True)
-
+    st.markdown("""<div class="tc-text tc-column"><p><strong>1. (a)</strong> Contract entered into between Cross Refrigeration (N.I.) Limited and the Customer. (b) Overrides all earlier conditions. (c) All guarantees, warranties and conditions implied by statute are excluded.</p>
+    <p><strong>3.</strong> Prices provisional and subject to market changes.</p>
+    <p><strong>5.</strong> Payment strictly within 30 days of invoice.</p>
+    <p><strong>11.</strong> Interest charged at 2% per month on overdue sums.</p>
+    <p><strong>19.</strong> Ownership remains with the Company until full payment.</p>
+    <p><strong>21.</strong> Disputes governed by laws of Northern Ireland.</p>
+    <p><strong>22.</strong> Specifications remain Company property.</p>
+    <p><strong>23.</strong> Scheduled orders constitute authority to manufacture.</p></div>""", unsafe_allow_html=True)
     if st.button("⬅️ Back to Editor"): st.rerun()
 
 # --- 6. EXPORT ---
-current_params = { "proj_name": proj_name, "area_val": area_val, "height_val": height_val, "ach_val": ach_val, "door_area_val": door_area_val, "ext_wall_area_val": ext_wall_area_val, "int_wall_length": int_wall_length, "client_name": client_name, "contact_person": contact_person, "cross_ref": cross_ref, "target_temp": target_temp, "ext_temp": ext_temp, "delta_t_int": delta_t_int, "preheat_pct": preheat_pct, "supply_delta": supply_delta, "airflow_unit": airflow_unit, "show_budget": show_budget, "heat_source": heat_source, "elec_price": elec_price, "gas_price": gas_price, "cop": cop, "full_load_hrs": full_load_hrs, "season_days": season_days, "u_wall_ext": u_wall_ext, "u_wall_int": u_wall_int, "u_floor": u_floor, "u_roof": u_roof, "u_door": u_door }
-st.sidebar.download_button("📥 Export Project Data", data=json.dumps(current_params), file_name=f"audit_{proj_name}.json", use_container_width=True)
+cur_p = { "proj_name": proj_name, "area_val": area_val, "height_val": height_val, "ach_val": ach_val, "door_area_val": door_area_val, "ext_wall_len": ext_wall_len, "int_wall_len": int_wall_len, "client_name": client_name, "contact_person": contact_person, "cross_ref": cross_ref, "target_temp": target_temp, "ext_temp": ext_temp, "delta_t_int": delta_t_int, "preheat_pct": preheat_pct, "supply_delta": supply_delta, "airflow_unit": airflow_unit, "show_budget": show_budget, "heat_source": heat_source, "elec_price": elec_price, "gas_price": gas_price, "cop": cop, "full_load_hrs": full_load_hrs, "season_days": season_days, "u_wall_ext": u_wall_ext, "u_wall_int": u_wall_int, "u_floor": u_floor, "u_roof": u_roof, "u_door": u_door }
+st.sidebar.download_button("📥 Export Project Data", data=json.dumps(cur_p), file_name=f"audit_{proj_name}.json", use_container_width=True)
